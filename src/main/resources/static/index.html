@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Tracker</title>
+    <style>
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+        .form-section, .habit-card, .stats-section {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            background-color: #3a3a3a;
+            color: #ffffff;
+            border: 1px solid #4a4a4a;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: #ffffff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .habit-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .habit-details p {
+            margin: 5px 0;
+            color: #cccccc;
+        }
+        .habit-actions button {
+            background-color: #28a745;
+        }
+        .habit-actions button:nth-child(2) {
+            background-color: #ffc107;
+        }
+        .habit-actions button:nth-child(3) {
+            background-color: #dc3545;
+        }
+        .habit-actions button:nth-child(4) {
+            background-color: #6f42c1;
+        }
+        .habit-actions button:hover {
+            opacity: 0.9;
+        }
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 5px;
+            width: 90%;
+            max-width: 400px;
+        }
+        .stats-section pre {
+            color: #cccccc;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Habit Tracker</h1>
+
+    <!-- Add Habit Form -->
+    <div class="form-section">
+        <h2>Add New Habit</h2>
+        <form id="addHabitForm">
+            <input type="text" id="habitName" placeholder="Habit Name" required>
+            <input type="text" id="habitDescription" placeholder="Description">
+            <button type="submit">Add</button>
+        </form>
+    </div>
+
+    <!-- Habit List -->
+    <div id="habitList"></div>
+
+    <!-- Stats Display -->
+    <div id="statsSection" class="stats-section" style="display: none;">
+        <h2>Habit Stats</h2>
+        <pre id="statsContent"></pre>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>Edit Habit</h2>
+            <form id="editHabitForm">
+                <input type="hidden" id="editHabitId">
+                <input type="text" id="editHabitName" required>
+                <input type="text" id="editHabitDescription">
+                <button type="submit">Save</button>
+                <button type="button" onclick="closeEditModal()">Cancel</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Fetch all habits on load
+    document.addEventListener('DOMContentLoaded', fetchHabits);
+
+    // Add habit form submission
+    document.getElementById('addHabitForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('habitName').value;
+        const description = document.getElementById('habitDescription').value;
+        try {
+            const response = await fetch('/api/habits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, description }),
+            });
+            if (!response.ok) throw new Error('Failed to add habit');
+            document.getElementById('habitName').value = '';
+            document.getElementById('habitDescription').value = '';
+            fetchHabits();
+        } catch (error) {
+            alert(error.message);
+        }
+    });
+
+    // Fetch and display habits
+    async function fetchHabits() {
+        try {
+            const response = await fetch('/api/habits');
+            if (!response.ok) throw new Error('Failed to fetch habits');
+            const habits = await response.json();
+            const habitList = document.getElementById('habitList');
+            habitList.innerHTML = '';
+            habits.forEach(habit => {
+                const habitCard = document.createElement('div');
+                habitCard.className = 'habit-card';
+                habitCard.innerHTML = `
+                    <div class="habit-details">
+                        <h3>${habit.name}</h3>
+                        <p>${habit.description || ''}</p>
+                        <p>Streak: ${habit.streak} days</p>
+                    </div>
+                    <div class="habit-actions">
+                        <button onclick="logHabit(${habit.id})">Log</button>
+                        <button onclick="openEditModal(${habit.id}, '${habit.name}', '${habit.description || ''}')">Edit</button>
+                        <button onclick="deleteHabit(${habit.id})">Delete</button>
+                        <button onclick="fetchStats(${habit.id})">Stats</button>
+                    </div>
+                `;
+                habitList.appendChild(habitCard);
+            });
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    // Log a habit
+    async function logHabit(id) {
+        try {
+            const response = await fetch(`/api/habits/${id}/log`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed: true }),
+            });
+            if (!response.ok) throw new Error('Failed to log habit');
+            fetchHabits();
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    // Open edit modal
+    function openEditModal(id, name, description) {
+        document.getElementById('editHabitId').value = id;
+        document.getElementById('editHabitName').value = name;
+        document.getElementById('editHabitDescription').value = description;
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    // Close edit modal
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+
+    // Edit habit form submission
+    document.getElementById('editHabitForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('editHabitId').value;
+        const name = document.getElementById('editHabitName').value;
+        const description = document.getElementById('editHabitDescription').value;
+        try {
+            const response = await fetch(`/api/habits/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, name, description }),
+            });
+            if (!response.ok) throw new Error('Failed to update habit');
+            closeEditModal();
+            fetchHabits();
+        } catch (error) {
+            alert(error.message);
+        }
+    });
+
+    // Delete a habit
+    async function deleteHabit(id) {
+        try {
+            const response = await fetch(`/api/habits/${id}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error('Failed to delete habit');
+            fetchHabits();
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    // Fetch and display stats
+    async function fetchStats(id) {
+        try {
+            const response = await fetch(`/api/habits/${id}/stats`);
+            if (!response.ok) throw new Error('Failed to fetch stats');
+            const stats = await response.text();
+            const statsSection = document.getElementById('statsSection');
+            document.getElementById('statsContent').textContent = stats;
+            statsSection.style.display = 'block';
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+</script>
+</body>
+</html>
