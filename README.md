@@ -110,3 +110,10 @@ README.md
 ```
 
 ### Screenshot of the Application
+![Image](https://github.com/user-attachments/assets/e544293a-27e7-4b79-a6f6-351b9cdbfea4)
+
+## Contributing
+
+Contributions are welcome!
+
+ - &copy; Avishka14
